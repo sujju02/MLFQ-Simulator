@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+
+# Compiled Binaries & Objects
+*.exe
+*.o
+*.obj
+*.dll
+
+# Build & Dist
+.dist/
+output/
+dist/
+build/
+*.egg-info/
+
+# Editor & OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MLFQ CPU Scheduling Simulator</title>
+  <meta name="description"
+        content="Interactive Multilevel Feedback Queue CPU Scheduling Simulator with Gantt Chart, aging, and performance metrics — OS College Project." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/style.css" />
+  <script>
+    (function() {
+      const saved = localStorage.getItem("mlfq-theme") || "dark";
+      document.documentElement.setAttribute("data-theme", saved);
+    })();
+  </script>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     NAV / HEADER
+══════════════════════════════════════════════════════════════════════ -->
+<header class="site-header">
+  <div class="header-inner">
+    <div class="header-brand">
+      <div class="brand-icon">
+        <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="18" cy="18" r="17" stroke="url(#hg)" stroke-width="2"/>
+          <rect x="8" y="12" width="8" height="4" rx="1" fill="url(#hg2)"/>
+          <rect x="8" y="18" width="12" height="4" rx="1" fill="url(#hg2)" opacity="0.7"/>
+          <rect x="8" y="24" width="6" height="4" rx="1" fill="url(#hg2)" opacity="0.4"/>
+          <circle cx="26" cy="14" r="4" fill="url(#hg3)" />
+          <defs>
+            <linearGradient id="hg" x1="0" y1="0" x2="36" y2="36" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#6366f1"/><stop offset="1" stop-color="#a855f7"/>
+            </linearGradient>
+            <linearGradient id="hg2" x1="0" y1="0" x2="20" y2="0" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#60a5fa"/><stop offset="1" stop-color="#818cf8"/>
+            </linearGradient>
+            <linearGradient id="hg3" x1="22" y1="10" x2="30" y2="18" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#a78bfa"/><stop offset="1" stop-color="#c084fc"/>
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+      <div>
+        <h1 class="brand-title">MLFQ Scheduler</h1>
+        <p class="brand-sub">Multilevel Feedback Queue · OS Simulator</p>
+      </div>
+    </div>
+    <nav class="header-nav">
+      <button class="nav-btn active" data-tab="dashboard" id="nav-dashboard">Dashboard</button>
+      <button class="nav-btn" data-tab="simulate"  id="nav-simulate">Simulate</button>
+      <button class="nav-btn" data-tab="results"   id="nav-results">Results</button>
+      <button class="nav-btn" data-tab="about"     id="nav-about">About</button>
+    </nav>
+    <button id="theme-toggle" class="theme-toggle-btn" onclick="toggleTheme()" title="Switch Light / Dark Theme" aria-label="Toggle theme">
+      <span id="theme-icon">☀️</span>
+      <span id="theme-label" class="theme-label">Light</span>
+    </button>
+    <div id="status-pill" class="status-pill status-idle">● Idle</div>
+  </div>
+</header>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     TAB: DASHBOARD
+══════════════════════════════════════════════════════════════════════ -->
+<main>
+<section class="tab-content active" id="tab-dashboard">
+  <div class="container">
+
+    <!-- Hero -->
+    <div class="hero-card">
+      <div class="hero-text">
+        <span class="badge">Operating Systems Project</span>
+        <h2>Multilevel Feedback Queue<br/><span class="gradient-text">CPU Scheduling</span></h2>
+        <p>
+          MLFQ dynamically adjusts process priorities using multiple queues.
+          CPU-bound processes are gradually demoted to lower queues while
+          I/O-bound processes stay in higher-priority queues. An <em>aging</em>
+          mechanism prevents indefinite starvation.
+        </p>
+        <div class="hero-actions">
+          <button class="btn btn-primary" onclick="switchTab('simulate')">
+            <svg viewBox="0 0 20 20" fill="currentColor" width="18"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"/></svg>
+            Run Simulation
+          </button>
+          <button class="btn btn-outline" onclick="loadSampleData(1)">Load Sample Data</button>
+        </div>
+      </div>
+      <div class="hero-visual" aria-hidden="true">
+        <div class="queue-preview">
+          <div class="qp-row"><span class="qp-label">Q0</span><div class="qp-bar" style="--w:100%"><span>P1</span><span>P2</span></div><span class="qp-tag">RR·4ms</span></div>
+          <div class="qp-row"><span class="qp-label">Q1</span><div class="qp-bar" style="--w:66%"><span>P3</span></div><span class="qp-tag">RR·8ms</span></div>
+          <div class="qp-row"><span class="qp-label">Q2</span><div class="qp-bar" style="--w:33%"><span>P4</span></div><span class="qp-tag">FCFS</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Info Cards -->
+    <div class="info-grid">
+      <div class="info-card">
+        <div class="info-icon" style="--c:#6366f1">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22"><path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/></svg>
+        </div>
+        <h3>Three Priority Queues</h3>
+        <p>Q0 (highest) → Q1 → Q2 (lowest/FCFS). New processes always enter Q0.</p>
+      </div>
+      <div class="info-card">
+        <div class="info-icon" style="--c:#8b5cf6">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </div>
+        <h3>Time Quantum Demotion</h3>
+        <p>A process exhausting its Q0 (4 ms) quantum is demoted to Q1; from Q1 (8 ms) to Q2.</p>
+      </div>
+      <div class="info-card">
+        <div class="info-icon" style="--c:#a855f7">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </div>
+        <h3>Preemption</h3>
+        <p>A running low-priority process is immediately preempted when a higher-priority process arrives.</p>
+      </div>
+      <div class="info-card">
+        <div class="info-icon" style="--c:#ec4899">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        </div>
+        <h3>Aging</h3>
+        <p>Processes waiting ≥ aging threshold are promoted to prevent starvation. Reset on each promotion.</p>
+      </div>
+    </div>
+
+    <!-- Queue Config Summary -->
+    <div class="config-summary-card">
+      <h3>Current Queue Configuration</h3>
+      <div class="config-grid">
+        <div class="config-item">
+          <span class="config-label">Q0 Quantum</span>
+          <span class="config-value" id="summary-q0">4 ms</span>
+          <span class="config-sub">Round Robin · Highest Priority</span>
+        </div>
+        <div class="config-item">
+          <span class="config-label">Q1 Quantum</span>
+          <span class="config-value" id="summary-q1">8 ms</span>
+          <span class="config-sub">Round Robin · Medium Priority</span>
+        </div>
+        <div class="config-item">
+          <span class="config-label">Q2 Policy</span>
+          <span class="config-value">FCFS</span>
+          <span class="config-sub">Lowest Priority · No Preemption*</span>
+        </div>
+        <div class="config-item">
+          <span class="config-label">Aging Threshold</span>
+          <span class="config-value" id="summary-aging">10 ms</span>
+          <span class="config-sub">Wait time before promotion</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     TAB: SIMULATE
+══════════════════════════════════════════════════════════════════════ -->
+<section class="tab-content" id="tab-simulate">
+  <div class="container">
+
+    <div class="simulate-layout">
+
+      <!-- Left column: Config + Process Input -->
+      <div class="sim-left">
+
+        <!-- Config Panel -->
+        <div class="card">
+          <div class="card-header">
+            <h3>⚙ Queue Configuration</h3>
+          </div>
+          <div class="card-body">
+            <div class="form-row">
+              <div class="form-group">
+                <label for="q0-quantum">Q0 Time Quantum (ms)</label>
+                <input type="number" id="q0-quantum" value="4" min="1" max="1000" />
+              </div>
+              <div class="form-group">
+                <label for="q1-quantum">Q1 Time Quantum (ms)</label>
+                <input type="number" id="q1-quantum" value="8" min="1" max="1000" />
+              </div>
+              <div class="form-group">
+                <label for="aging-threshold">Aging Threshold (ms)</label>
+                <input type="number" id="aging-threshold" value="10" min="1" max="10000" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Process Input -->
+        <div class="card">
+          <div class="card-header">
+            <h3>📋 Process Input</h3>
+            <div class="card-header-actions">
+              <button class="btn btn-sm btn-ghost" onclick="loadSampleData(1)" id="btn-sample1">Sample 1</button>
+              <button class="btn btn-sm btn-ghost" onclick="loadSampleData(2)" id="btn-sample2">Sample 2</button>
+              <button class="btn btn-sm btn-danger-ghost" onclick="clearProcesses()" id="btn-clear">Clear</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="table-wrapper">
+              <table id="process-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Process ID</th>
+                    <th>Arrival Time (ms)</th>
+                    <th>Burst Time (ms)</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="process-tbody">
+                  <!-- Rows inserted by JS -->
+                </tbody>
+              </table>
+            </div>
+            <button class="btn btn-outline btn-sm mt-2" onclick="addProcessRow()" id="btn-add-row">
+              + Add Process
+            </button>
+          </div>
+        </div>
+
+        <!-- Run Controls -->
+        <div class="run-controls">
+          <button class="btn btn-primary btn-lg" onclick="runSimulation()" id="btn-run">
+            <svg viewBox="0 0 20 20" fill="currentColor" width="20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"/></svg>
+            Run Simulation
+          </button>
+          <button class="btn btn-outline" onclick="resetSimulation()" id="btn-reset">
+            <svg viewBox="0 0 20 20" fill="currentColor" width="18"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"/></svg>
+            Reset
+          </button>
+        </div>
+
+        <div id="error-box" class="error-box hidden"></div>
+
+      </div><!-- .sim-left -->
+
+      <!-- Right column: Queue Visualization & Interactive Animation -->
+      <div class="sim-right">
+        <div class="card">
+          <div class="card-header">
+            <h3>🔄 Animated Queue Visualization</h3>
+            <span class="timeline-step-badge" id="step-badge">Idle</span>
+          </div>
+          <div class="card-body queue-vis-body">
+
+            <!-- Playback Controller Toolbar -->
+            <div class="playback-toolbar">
+              <div class="playback-buttons">
+                <button class="btn-ctrl" onclick="jumpToStep(0)" title="Restart from beginning" id="btn-ctrl-start">⏮</button>
+                <button class="btn-ctrl" onclick="stepTimeline(-1)" title="Previous Step" id="btn-ctrl-prev">◀</button>
+                <button class="btn-ctrl btn-play" onclick="togglePlay()" title="Play / Pause" id="btn-ctrl-play">▶ Play</button>
+                <button class="btn-ctrl" onclick="stepTimeline(1)" title="Next Step" id="btn-ctrl-next">▶</button>
+                <button class="btn-ctrl" onclick="skipToEnd()" title="Skip to End / View Results" id="btn-ctrl-end">⏭ End</button>
+              </div>
+
+              <!-- Speed Selector -->
+              <div class="speed-selector">
+                <span class="speed-label">Speed:</span>
+                <button class="speed-btn" data-speed="1400" onclick="setSpeed(1400, this)">0.5x</button>
+                <button class="speed-btn active" data-speed="700" onclick="setSpeed(700, this)">1x</button>
+                <button class="speed-btn" data-speed="350" onclick="setSpeed(350, this)">2x</button>
+                <button class="speed-btn" data-speed="150" onclick="setSpeed(150, this)">4x</button>
+              </div>
+            </div>
+
+            <!-- Timeline Scrubber -->
+            <div class="scrubber-container">
+              <input type="range" id="timeline-scrubber" min="0" max="0" value="0" oninput="onScrub(this.value)" disabled />
+              <div class="scrubber-labels">
+                <span id="scrub-time-label">t = 0 ms</span>
+                <span id="scrub-step-label">Step 0 / 0</span>
+              </div>
+            </div>
+
+            <!-- Active Event Action Banner -->
+            <div id="action-banner" class="action-banner banner-idle">
+              <div class="banner-icon" id="banner-icon">ℹ</div>
+              <div class="banner-content">
+                <div class="banner-title" id="banner-title">Ready</div>
+                <div class="banner-desc" id="banner-desc">Click 'Run Simulation' to watch processes enter and move between queues</div>
+              </div>
+            </div>
+
+            <!-- CPU Active Core -->
+            <div class="running-box">
+              <div class="running-label">CPU CORE ▶</div>
+              <div id="running-process" class="running-proc-slot empty">
+                <span>CPU Idle</span>
+              </div>
+            </div>
+
+            <!-- Queues -->
+            <div class="queue-lanes">
+              <div class="queue-lane" id="lane-q0">
+                <div class="lane-header">
+                  <span class="lane-name">Queue 0</span>
+                  <span class="lane-info">Round Robin · Quantum = <span id="vis-q0-quantum">4</span>ms</span>
+                  <span class="lane-badge priority-high">HIGH</span>
+                </div>
+                <div class="lane-processes" id="vis-q0-procs">
+                  <span class="empty-lane">Empty (New arrivals enter here)</span>
+                </div>
+              </div>
+
+              <div class="queue-lane" id="lane-q1">
+                <div class="lane-header">
+                  <span class="lane-name">Queue 1</span>
+                  <span class="lane-info">Round Robin · Quantum = <span id="vis-q1-quantum">8</span>ms · Aging = <span id="vis-q1-aging">10</span>ms</span>
+                  <span class="lane-badge priority-med">MED</span>
+                </div>
+                <div class="lane-processes" id="vis-q1-procs">
+                  <span class="empty-lane">Empty (Demoted from Q0 after 4ms quantum)</span>
+                </div>
+              </div>
+
+              <div class="queue-lane" id="lane-q2">
+                <div class="lane-header">
+                  <span class="lane-name">Queue 2</span>
+                  <span class="lane-info">FCFS · Aging = <span id="vis-q2-aging">10</span>ms</span>
+                  <span class="lane-badge priority-low">LOW</span>
+                </div>
+                <div class="lane-processes" id="vis-q2-procs">
+                  <span class="empty-lane">Empty (Demoted from Q1 after 8ms quantum)</span>
+                </div>
+              </div>
+
+              <!-- Completed Lane -->
+              <div class="queue-lane lane-completed" id="lane-completed">
+                <div class="lane-header">
+                  <span class="lane-name">Completed</span>
+                  <span class="lane-info">Finished Processes</span>
+                  <span class="lane-badge priority-done">DONE</span>
+                </div>
+                <div class="lane-processes" id="vis-completed-procs">
+                  <span class="empty-lane">No completed processes yet</span>
+                </div>
+              </div>
+            </div><!-- .queue-lanes -->
+
+          </div>
+        </div>
+
+        <!-- Event Log -->
+        <div class="card">
+          <div class="card-header">
+            <h3>📜 Event Log</h3>
+            <button class="btn btn-sm btn-ghost" onclick="clearLog()" id="btn-clear-log">Clear</button>
+          </div>
+          <div class="card-body">
+            <div id="event-log" class="event-log">
+              <span class="log-empty">Run a simulation to see events…</span>
+            </div>
+          </div>
+        </div>
+      </div><!-- .sim-right -->
+
+    </div><!-- .simulate-layout -->
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     TAB: RESULTS
+══════════════════════════════════════════════════════════════════════ -->
+<section class="tab-content" id="tab-results">
+  <div class="container">
+
+    <div id="no-results-msg" class="no-results">
+      <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" width="64">
+        <circle cx="32" cy="32" r="30" stroke="#334155" stroke-width="2"/>
+        <path d="M20 32h24M32 20v24" stroke="#475569" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <p>No results yet. <a href="#" onclick="switchTab('simulate');return false;">Run a simulation</a> to see the Gantt chart and metrics.</p>
+    </div>
+
+    <div id="results-content" class="hidden">
+
+      <!-- Gantt Chart -->
+      <div class="card">
+        <div class="card-header">
+          <h3>📊 Gantt Chart</h3>
+          <div class="gantt-legend" id="gantt-legend"></div>
+        </div>
+        <div class="card-body">
+          <div class="gantt-scroll-container">
+            <canvas id="gantt-canvas" height="120"></canvas>
+          </div>
+          <div id="gantt-timeline" class="gantt-timeline"></div>
+        </div>
+      </div>
+
+      <!-- Summary Stats -->
+      <div class="stats-grid" id="stats-grid"></div>
+
+      <!-- Per-Process Table -->
+      <div class="card">
+        <div class="card-header">
+          <h3>📋 Per-Process Metrics</h3>
+        </div>
+        <div class="card-body">
+          <div class="table-wrapper">
+            <table id="metrics-table">
+              <thead>
+                <tr>
+                  <th>PID</th>
+                  <th>Arrival (ms)</th>
+                  <th>Burst (ms)</th>
+                  <th>Completion (ms)</th>
+                  <th>TAT (ms)</th>
+                  <th>WT (ms)</th>
+                  <th>RT (ms)</th>
+                </tr>
+              </thead>
+              <tbody id="metrics-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Queue Transition History -->
+      <div class="card">
+        <div class="card-header">
+          <h3>🔁 Queue Transition History</h3>
+        </div>
+        <div class="card-body">
+          <div id="transition-log" class="event-log"></div>
+        </div>
+      </div>
+
+    </div><!-- #results-content -->
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     TAB: ABOUT
+══════════════════════════════════════════════════════════════════════ -->
+<section class="tab-content" id="tab-about">
+  <div class="container">
+    <div class="about-grid">
+      <div class="card about-card">
+        <div class="card-header"><h3>📖 Algorithm Details</h3></div>
+        <div class="card-body about-body">
+          <h4>MLFQ Scheduling Rules</h4>
+          <ol>
+            <li>Every new process enters <strong>Q0</strong> (highest priority).</li>
+            <li>Higher-priority queues always execute before lower ones.</li>
+            <li>If a process exhausts its time quantum it is <strong>demoted</strong> to the next lower queue.</li>
+            <li>Processes that complete before the quantum expires are simply removed.</li>
+            <li>A lower-priority process is <strong>preempted</strong> when a higher-priority process arrives.</li>
+            <li>Q2 uses <strong>FCFS</strong> (no quantum limit unless preempted).</li>
+            <li>Remaining burst time is preserved across preemptions and demotions.</li>
+          </ol>
+          <h4>Aging Policy</h4>
+          <p>
+            Each millisecond a process spends <em>waiting</em> in Q1 or Q2 increments its
+            <code>wait_in_queue</code> counter. When this counter reaches the
+            <strong>aging threshold</strong>, the process is promoted one level up and its
+            counter is reset to 0. If the promoted process ends up at higher priority
+            than the current running process, an immediate preemption occurs.
+          </p>
+          <h4>Formulae</h4>
+          <ul>
+            <li><strong>TAT</strong> = Completion Time − Arrival Time</li>
+            <li><strong>WT</strong> = TAT − Burst Time</li>
+            <li><strong>RT</strong> = First CPU Start − Arrival Time</li>
+            <li><strong>CPU Utilization</strong> = Busy CPU Time / Total Simulation Time × 100</li>
+            <li><strong>Throughput</strong> = Completed Processes / Total Simulation Time</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card about-card">
+        <div class="card-header"><h3>🛠 Tech Stack</h3></div>
+        <div class="card-body about-body">
+          <ul class="tech-list">
+            <li><span class="tech-badge c">C</span> Core scheduling algorithm — compiled with GCC</li>
+            <li><span class="tech-badge py">Python</span> Flask REST API — bridges C binary and browser</li>
+            <li><span class="tech-badge html">HTML</span> Semantic dashboard markup</li>
+            <li><span class="tech-badge css">CSS</span> Vanilla dark-theme styling</li>
+            <li><span class="tech-badge js">JS</span> Frontend logic, Canvas Gantt chart</li>
+          </ul>
+          <h4>Project Structure</h4>
+          <pre class="code-block">MLFQ_Scheduler/
+├── scheduler.c       ← C algorithm
+├── app.py            ← Flask backend
+├── requirements.txt
+├── templates/
+│   └── index.html    ← This UI
+├── static/
+│   ├── style.css
+│   └── script.js
+└── README.md</pre>
+        </div>
+      </div>
+
+      <div class="card about-card">
+        <div class="card-header"><h3>🧪 Test Cases</h3></div>
+        <div class="card-body about-body">
+          <h4>Test Case 1 — Basic MLFQ</h4>
+          <table class="mini-table">
+            <tr><th>PID</th><th>AT</th><th>BT</th></tr>
+            <tr><td>P1</td><td>0</td><td>10</td></tr>
+            <tr><td>P2</td><td>1</td><td>5</td></tr>
+            <tr><td>P3</td><td>2</td><td>3</td></tr>
+            <tr><td>P4</td><td>3</td><td>7</td></tr>
+          </table>
+          <p>Config: Q0=4, Q1=8, Q2=FCFS, Aging=10</p>
+
+          <h4>Test Case 2 — Aging Demonstration</h4>
+          <table class="mini-table">
+            <tr><th>PID</th><th>AT</th><th>BT</th></tr>
+            <tr><td>P1</td><td>0</td><td>30</td></tr>
+            <tr><td>P2</td><td>0</td><td>30</td></tr>
+            <tr><td>P3</td><td>0</td><td>2</td></tr>
+          </table>
+          <p>Config: Q0=4, Q1=8, Q2=FCFS, Aging=10</p>
+          <button class="btn btn-sm btn-outline" onclick="loadSampleData(1)">Load TC1</button>
+          <button class="btn btn-sm btn-outline" onclick="loadSampleData(2)">Load TC2</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     FOOTER
+══════════════════════════════════════════════════════════════════════ -->
+<footer class="site-footer">
+  <div class="footer-inner">
+    <span>MLFQ CPU Scheduling Simulator · OS College Project</span>
+    <span>Built with C + Python Flask + Vanilla JS</span>
+  </div>
+</footer>
+
+<!-- Toast notification -->
+<div id="toast" class="toast hidden"></div>
+
+<script src="/static/script.js"></script>
+</body>
+</html>
