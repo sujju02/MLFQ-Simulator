@@ -198,6 +198,4 @@ P3 finishes quickly in Q0. P1 and P2 cycle through Q0→Q1→Q2. The aging mecha
 
 ---
 
-## Author
 
-College OS Project — MLFQ CPU Scheduling Simulator
